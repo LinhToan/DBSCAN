@@ -1,0 +1,139 @@
+import numpy as np
+import math as m
+import random as rd
+from sklearn import datasets
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+mpl.rcParams['figure.figsize'] = (8,8)
+
+######################################################################
+
+x, y = datasets.make_circles(n_samples=1000, noise=.04, factor = .3)
+
+plt.scatter(x[:, 0], x[:, 1], c=y)
+
+###########################################################################
+
+#initialize point to start process
+
+epsilon = .1
+
+initial_point_number = rd.randint(0, len(x))
+
+initial_point = x[initial_point_number]
+
+#the next part is just so we can see what is going on
+
+initial_neighborhood = plt.Circle((initial_point[0], initial_point[1]), epsilon, color = 'r', fill=False)
+
+fig, ax = plt.subplots()
+
+ax.add_artist(initial_neighborhood)
+ax.scatter(x[:, 0], x[:, 1], color = 'k')
+ax.scatter(initial_point[0], initial_point[1], color = 'r')
+
+###############################################################################
+
+#now we need to "find" the points that are in this neighborhood.
+
+neighborhood_points = []
+
+for point in x:
+    if np.linalg.norm(initial_point - point) < epsilon:
+        neighborhood_points.append(point)
+
+#visualize new neighborhoods
+neighborhoods = []
+for point in neighborhood_points:
+    neighborhood = plt.Circle((point[0], point[1]), epsilon, color = 'r', fill = False)
+    neighborhoods.append(neighborhood)
+
+fig, ax = plt.subplots()
+
+for neighborhood in neighborhoods:
+    ax.add_artist(neighborhood)
+ax.scatter(x[:,0], x[:, 1], color = 'k')
+for point in neighborhood_points:
+    ax.scatter(point[0], point[1], color = 'r')
+    
+###################################################################################
+
+def DBSCAN(data, epsilon = .1, minPoints = 3):
+    """Use the DBSCAN algorithm to cluster data. The number of points in the epsilon neighborhood must be greater than minPoints or the point will be classified as noise."""
+    
+    #Create a copy of the data we can make changes change without changing the original data
+    copy_data = np.copy(data)
+    
+    #initialize list of clusters (in the end if the cluster has length 1, it will be noise.)
+    clusters = []
+    
+    #start process, this while loop stops once every point is classified in a cluster (again it may be the only point in a cluster, i.e. noise)
+    while sum(len(cluster) for cluster in clusters) < len(data):
+        
+        clusters.append([])
+        
+        #initialize point not visited (this is why I want to copy the data, so I can remove points once visited and classified)
+        #initial_point = np.random.choice(copy_data) # I may use this instead of the following
+        initial_point_number = rd.randint(0, len(copy_data)-1)
+
+        initial_point = copy_data[initial_point_number]
+        
+        copy_data = np.delete(copy_data, initial_point_number, 0)
+        
+        clusters[-1].append(initial_point)
+        
+        #determine the number of points in the epsilon radius of the point, excluding the initial point
+        neighborhood_points_dict ={i:point for i, point in enumerate(copy_data) if (np.linalg.norm(initial_point - point) > 0 and np.linalg.norm(initial_point-point) < epsilon)}
+        neighborhood_points = [neighborhood_points_dict[i] for i in neighborhood_points_dict.keys()]
+        neighborhood_points_index = [i for i in neighborhood_points_dict.keys()]
+        
+        if len(neighborhood_points) > minPoints:
+            
+            copy_data = np.delete(copy_data, neighborhood_points_index, 0)
+            
+            for nbhd_point in neighborhood_points:
+                new_nbhd_dict = {i:point for i, point in enumerate(copy_data) if (np.linalg.norm(nbhd_point - point) > 0 and np.linalg.norm(nbhd_point-point) < epsilon)}
+                if len(new_nbhd_dict) > 0:
+                    nbhd_points = [new_nbhd_dict[i] for i in new_nbhd_dict.keys()]
+                    for point in nbhd_points:
+                        neighborhood_points.append(point)
+                        
+                    nbhd_index = [i for i in new_nbhd_dict.keys()]
+                    copy_data = np.delete(copy_data, nbhd_index, 0)
+                    
+
+            for point in neighborhood_points:
+                clusters[-1].append(point)
+
+    return clusters
+    
+########################################################################################################################
+    
+clusters = DBSCAN(x, epsilon = .1, minPoints = 3)   
+colors = ['b', 'g', 'r', 'c', 'm', 'y']
+plt.figure()
+
+for i, cluster in enumerate(clusters):
+    for j in range(len(cluster)):
+        plt.scatter(cluster[j][0], cluster[j][1], color = colors[i%len(colors)] )
+
+############################################################################
+
+x, y = datasets.make_moons(n_samples=1000, noise=0.1)
+
+clusters = DBSCAN(x, epsilon = .1, minPoints = 3)
+
+plt.figure()
+
+for i, cluster in enumerate(clusters):
+    for j in range(len(cluster)):
+        plt.scatter(cluster[j][0], cluster[j][1], color = colors[i%len(colors)] )
+    
+#######################################################################################
+
+from sklearn.cluster import DBSCAN as skDB
+
+clustering = skDB(eps=.1, min_samples=4).fit(x)
+
+
+plt.scatter(x[:,0], x[:,1], c = clustering.labels_)
